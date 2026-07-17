@@ -1,19 +1,49 @@
 name: Build Indras-Mirror llama.cpp (RTX 4070 Ti Super)
-on: [workflow_dispatch]
+
+on:
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { submodules: true }
-      - uses: Jimver/cuda-toolkit@v0.2.14
+      - name: 1. 拉取代码主干 (关闭自动子模块以避开原作者的Bug)
+        uses: actions/checkout@v4
+        with:
+          submodules: false 
+
+      - name: 1.1 强行修复原作者损坏的子模块并拉取
+        shell: bash
+        run: |
+          # 从配置文件中强行删掉那个没有 URL 的 AXELRAM 错误引用
+          git config -f .gitmodules --remove-section submodule.reference/AXELRAM || true
+          git rm --cached reference/AXELRAM || true
+          # 重新同步并拉取其他所有正常的子模块
+          git submodule sync
+          git submodule update --init --recursive
+
+      - name: 2. 安装 CUDA 12.4 编译环境
+        uses: Jimver/cuda-toolkit@v0.2.14
         id: cuda-toolkit
-        with: { cuda: '12.4.1' }
-      - run: |
-          mkdir build && cd build
+        with:
+          cuda: '12.4.1'
+
+      - name: 3. 配置 CMake (关闭CURL彻底根除OpenSSL缺失问题)
+        shell: cmd
+        run: |
+          mkdir build
+          cd build
           cmake .. -G "Visual Studio 17 2022" -A x64 -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=89 -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
+
+      - name: 4. 开始多核并行编译
+        shell: cmd
+        run: |
+          cd build
           cmake --build . --config Release -j 4
-      - run: |
+
+      - name: 5. 自动打包所有必需的 DLL 和 EXE
+        shell: powershell
+        run: |
           mkdir release_package
           copy build\bin\Release\*.exe release_package\
           copy build\bin\Release\*.dll release_package\
@@ -21,7 +51,9 @@ jobs:
           copy "$cuda_bin\cudart64_12.dll" release_package\
           copy "$cuda_bin\cublas64_12.dll" release_package\
           copy "$cuda_bin\cublasLt64_12.dll" release_package\
-      - uses: actions/upload-artifact@v4
+
+      - name: 6. 上传最终绿色完整版
+        uses: actions/upload-artifact@v4
         with:
-          name: llama-cpp-Indras-MTP-TQ3
+          name: llama-cpp-Indras-MTP-TQ3-Ultimate
           path: release_package\*
