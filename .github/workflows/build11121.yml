@@ -7,18 +7,20 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: 1. 拉取代码主干 (关闭自动子模块以避开原作者的Bug)
+      - name: 1. 拉取代码主干 (关闭自动子模块)
         uses: actions/checkout@v4
         with:
           submodules: false 
 
-      - name: 1.1 强行修复原作者损坏的子模块并拉取
+      - name: 1.1 强行清理原作者所有的垃圾子模块引用 (核弹级清理)
         shell: bash
         run: |
-          # 从配置文件中强行删掉那个没有 URL 的 AXELRAM 错误引用
+          # 直接把原作者的私人草稿纸文件夹从 git 索引中彻底删除，不留后患！
+          git rm -r --cached reference || true
+          # 清理可能残留的配置文件
+          git config -f .gitmodules --remove-section submodule.reference/llama-cpp-turboquant-cuda || true
           git config -f .gitmodules --remove-section submodule.reference/AXELRAM || true
-          git rm --cached reference/AXELRAM || true
-          # 重新同步并拉取其他所有正常的子模块
+          # 重新同步并拉取真正有用的子模块
           git submodule sync
           git submodule update --init --recursive
 
