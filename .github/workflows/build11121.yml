@@ -5,27 +5,24 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022   # <--- 唯一修改的地方：强制指定使用 2022 版服务器
     steps:
       - name: 1. 拉取代码主干 (关闭自动子模块)
         uses: actions/checkout@v4
         with:
           submodules: false 
 
-      - name: 1.1 强行清理原作者所有的垃圾子模块引用 (核弹级清理)
+      - name: 1.1 强行清理原作者所有的垃圾子模块引用
         shell: bash
         run: |
-          # 直接把原作者的私人草稿纸文件夹从 git 索引中彻底删除，不留后患！
           git rm -r --cached reference || true
-          # 清理可能残留的配置文件
           git config -f .gitmodules --remove-section submodule.reference/llama-cpp-turboquant-cuda || true
           git config -f .gitmodules --remove-section submodule.reference/AXELRAM || true
-          # 重新同步并拉取真正有用的子模块
           git submodule sync
           git submodule update --init --recursive
 
       - name: 2. 安装 CUDA 12.4 编译环境
-        uses: Jimver/cuda-toolkit@v0.2.14
+        uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with:
           cuda: '12.4.1'
